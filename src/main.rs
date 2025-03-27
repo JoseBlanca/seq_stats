@@ -10,7 +10,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Read};
 /// `"-"` means read from stdin.
 fn open_maybe_gzipped(path: &str) -> Result<Box<dyn Read>, Box<dyn std::error::Error>> {
     let raw_input: Box<dyn Read> = if path == "-" {
-        Box::new(io::stdin())
+        Box::new(io::stdin().lock())
     } else {
         Box::new(File::open(path)?)
     };
