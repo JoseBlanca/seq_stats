@@ -39,6 +39,7 @@ struct ReadStats {
 fn calc_read_stats(
     in_seq_fpath: &str,
     out_stats_fpath: &str,
+    out_seqs: &bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Calculating read stats for file: {}", in_seq_fpath);
 
@@ -91,8 +92,9 @@ fn calc_read_stats(
         *gc_distrib.entry(gc_percent).or_insert(0) += 1;
         *len_distrib.entry(len).or_insert(0) += 1;
 
-        fastq_writer.write_record(&record)?;
-
+        if *out_seqs {
+            fastq_writer.write_record(&record)?;
+        };
         total_records += 1;
     }
 
@@ -128,14 +130,19 @@ struct Cli {
     /// Path to output JSON stats file
     #[arg(short, long, required = true)]
     out_stats: String,
+
+    /// Output sequences to stdout
+    #[arg(long)]
+    seqs_to_stdout: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
     let in_seq_fpath = &args.input_seq;
     let out_stats_fpath = &args.out_stats;
+    let out_seqs = &args.seqs_to_stdout;
 
-    let _ = calc_read_stats(in_seq_fpath, out_stats_fpath);
+    let _ = calc_read_stats(in_seq_fpath, out_stats_fpath, out_seqs);
 
     Ok(())
 }
@@ -143,7 +150,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /*
 TODO
 
-Allow not to output seq file setting output file to null
 Add tests
 
  */
