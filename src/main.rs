@@ -40,29 +40,38 @@ fn calc_read_stats(in_seq_file: &str) -> Result<(), Box<dyn std::error::Error>> 
     let mut gc_percent: u8;
     let mut len: usize;
     let mut seq: &[u8];
+
     loop {
-        match reader.read(&mut record) {
-            Ok(()) => {
-                if record.seq().is_empty() {
-                    // End of valid content (e.g., trailing blank lines)
-                    break;
+        // Try to read the next record
+        let read_result = reader.read(&mut record);
+
+        // Handle possible errors
+        if let Err(e) = read_result {
+            match e {
+                FastqError::ReadError(ref io_err) if io_err.kind() == ErrorKind::UnexpectedEof => {
+                    break
                 }
-                seq = record.seq();
-                gc_count = seq
-                    .iter()
-                    .filter(|&&b| b == b'G' || b == b'g' || b == b'C' || b == b'c')
-                    .count();
-                len = seq.len();
-                gc_percent = ((gc_count as f64 / len as f64) * 100.0).round() as u8;
-                println!("{len} {gc_percent}");
-                total_records += 1;
+                FastqError::IncompleteRecord => {
+                    return Err("Encountered incomplete FASTQ record".into())
+                }
+                other => return Err(Box::new(other)),
             }
-            Err(FastqError::ReadError(ref e)) if e.kind() == ErrorKind::UnexpectedEof => break,
-            Err(FastqError::IncompleteRecord) => {
-                return Err("Encountered incomplete FASTQ record".into());
-            }
-            Err(e) => return Err(Box::new(e)),
         }
+
+        // Check for implicit EOF case (blank trailing lines)
+        if record.seq().is_empty() {
+            break;
+        }
+
+        seq = record.seq();
+        gc_count = seq
+            .iter()
+            .filter(|&&b| b == b'G' || b == b'g' || b == b'C' || b == b'c')
+            .count();
+        len = seq.len();
+        gc_percent = ((gc_count as f64 / len as f64) * 100.0).round() as u8;
+        println!("{len} {gc_percent}");
+        total_records += 1;
     }
 
     println!("Total records: {}", total_records);
