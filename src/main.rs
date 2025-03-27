@@ -1,4 +1,4 @@
-use bio::io::fastq::{Error as FastqError, FastqRead, Reader, Record};
+use bio::io::fastq::{Error as FastqError, FastqRead, Reader, Record, Writer};
 use clap::Parser;
 use flate2::read::MultiGzDecoder;
 use serde::Serialize;
@@ -56,6 +56,9 @@ fn calc_read_stats(
     let mut gc_distrib: HashMap<u8, usize> = HashMap::new();
     let mut len_distrib: HashMap<usize, usize> = HashMap::new();
 
+    let handle = io::stdout().lock();
+    let mut fastq_writer = Writer::new(handle);
+
     loop {
         // Try to read the next record
         let read_result = reader.read(&mut record);
@@ -87,6 +90,9 @@ fn calc_read_stats(
         gc_percent = ((gc_count as f64 / len as f64) * 100.0).round() as u8;
         *gc_distrib.entry(gc_percent).or_insert(0) += 1;
         *len_distrib.entry(len).or_insert(0) += 1;
+
+        fastq_writer.write_record(&record)?;
+
         total_records += 1;
     }
 
