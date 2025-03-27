@@ -1,8 +1,10 @@
 use bio::io::fastq::{Error as FastqError, FastqRead, Reader, Record};
 use clap::Parser;
 use flate2::read::MultiGzDecoder;
+use serde::Serialize;
+use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, ErrorKind, Read};
+use std::io::{self, BufRead, BufReader, BufWriter, ErrorKind, Read};
 
 /// Opens a file or stdin, and decompresses if gzipped.
 /// `"-"` means read from stdin.
@@ -27,7 +29,17 @@ fn open_maybe_gzipped(path: &str) -> Result<Box<dyn Read>, Box<dyn std::error::E
     }
 }
 
-fn calc_read_stats(in_seq_fpath: &str) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Serialize)]
+struct ReadStats {
+    total_records: i32,
+    gc_distrib: HashMap<u8, usize>,
+    len_distrib: HashMap<usize, usize>,
+}
+
+fn calc_read_stats(
+    in_seq_fpath: &str,
+    out_stats_fpath: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("Calculating read stats for file: {}", in_seq_fpath);
 
     let input = open_maybe_gzipped(in_seq_fpath)?;
@@ -41,6 +53,8 @@ fn calc_read_stats(in_seq_fpath: &str) -> Result<(), Box<dyn std::error::Error>>
     let mut gc_percent: u8;
     let mut len: usize;
     let mut seq: &[u8];
+    let mut gc_distrib: HashMap<u8, usize> = HashMap::new();
+    let mut len_distrib: HashMap<usize, usize> = HashMap::new();
 
     loop {
         // Try to read the next record
@@ -71,11 +85,22 @@ fn calc_read_stats(in_seq_fpath: &str) -> Result<(), Box<dyn std::error::Error>>
             .count();
         len = seq.len();
         gc_percent = ((gc_count as f64 / len as f64) * 100.0).round() as u8;
-        println!("{len} {gc_percent}");
+        *gc_distrib.entry(gc_percent).or_insert(0) += 1;
+        *len_distrib.entry(len).or_insert(0) += 1;
         total_records += 1;
     }
 
-    println!("Total records: {}", total_records);
+    let stats = ReadStats {
+        total_records: total_records,
+        gc_distrib: gc_distrib,
+        len_distrib: len_distrib,
+    };
+
+    // write stats to file
+    let file = File::create(out_stats_fpath)?;
+    let writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, &stats)?;
+
     Ok(())
 }
 
@@ -93,13 +118,26 @@ struct Cli {
     /// output seq file path (default: "-" (stdout))
     #[arg(default_value = "-")]
     output_seq: String,
+
+    /// Path to output JSON stats file
+    #[arg(short, long, required = true)]
+    out_stats: String,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
     let in_seq_fpath = &args.input_seq;
+    let out_stats_fpath = &args.out_stats;
 
-    let _ = calc_read_stats(in_seq_fpath);
+    let _ = calc_read_stats(in_seq_fpath, out_stats_fpath);
 
     Ok(())
 }
+
+/*
+TODO
+
+Allow not to output seq file setting output file to null
+Add tests
+
+ */
