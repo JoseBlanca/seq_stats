@@ -1,4 +1,5 @@
 use bio::io::fastq::{Error as FastqError, FastqRead, Reader, Record};
+use clap::Parser;
 use flate2::read::MultiGzDecoder;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind, Read};
@@ -26,10 +27,10 @@ fn open_maybe_gzipped(path: &str) -> Result<Box<dyn Read>, Box<dyn std::error::E
     }
 }
 
-fn calc_read_stats(in_seq_file: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Calculating read stats for file: {}", in_seq_file);
+fn calc_read_stats(in_seq_fpath: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Calculating read stats for file: {}", in_seq_fpath);
 
-    let input = open_maybe_gzipped(in_seq_file)?;
+    let input = open_maybe_gzipped(in_seq_fpath)?;
 
     let bufreader = BufReader::new(input);
     let mut reader = Reader::new(bufreader);
@@ -78,9 +79,27 @@ fn calc_read_stats(in_seq_file: &str) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-fn main() {
-    let in_seq_file = "-";
-    //let in_seq_file = "seq.fastq.gz";
-    //let in_seq_file = "seq.fastq";
-    let _ = calc_read_stats(in_seq_file);
+#[derive(Parser)]
+#[command(
+    name = "seq_stats",
+    version = "0.1",
+    about = "Calculate GC content and length of sequences in a FASTQ file"
+)]
+struct Cli {
+    /// Input file path (default: "-" (stdin))
+    #[arg(default_value = "-")]
+    input_seq: String,
+
+    /// output seq file path (default: "-" (stdout))
+    #[arg(default_value = "-")]
+    output_seq: String,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Cli::parse();
+    let in_seq_fpath = &args.input_seq;
+
+    let _ = calc_read_stats(in_seq_fpath);
+
+    Ok(())
 }
