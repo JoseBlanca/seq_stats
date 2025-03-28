@@ -41,8 +41,6 @@ fn calc_read_stats(
     out_stats_fpath: &str,
     out_seqs: &bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Calculating read stats for file: {}", in_seq_fpath);
-
     let input = open_maybe_gzipped(in_seq_fpath)?;
 
     let bufreader = BufReader::new(input);
@@ -122,10 +120,6 @@ struct Cli {
     /// Input file path (default: "-" (stdin))
     #[arg(default_value = "-")]
     input_seq: String,
-
-    /// output seq file path (default: "-" (stdout))
-    #[arg(default_value = "-")]
-    output_seq: String,
 
     /// Path to output JSON stats file
     #[arg(short, long, required = true)]
